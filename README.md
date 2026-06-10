@@ -6,7 +6,7 @@
 
 ## What This Project Does
 
-Most traditional intrusion detection systems rely on signature matching — they flag traffic that matches a known attack pattern. This means they completely miss attacks they have never seen before.
+Most traditional intrusion detection systems rely on signature matching - they flag traffic that matches a known attack pattern. This means they completely miss attacks they have never seen before.
 
 This project takes a different approach: instead of learning what attacks look like, the model learns what **normal traffic** looks like. Anything that deviates significantly from normal gets flagged as suspicious. This is called **anomaly-based detection** and is the approach used in modern commercial security tools like Palo Alto's Cortex XDR.
 
@@ -35,7 +35,7 @@ All traffic → Autoencoder → Reconstruction Error
 
 ## Dataset
 
-**NSL-KDD** — a benchmark dataset for network intrusion detection research, provided by the Canadian Institute for Cybersecurity.
+**NSL-KDD** - a benchmark dataset for network intrusion detection research, provided by the Canadian Institute for Cybersecurity.
 
 - 125,973 training samples
 - 22,544 test samples
@@ -59,9 +59,9 @@ data/
 |---|---|
 | `pandas` | Data loading, filtering, inspection |
 | `numpy` | Array operations, reconstruction error calculation |
-| `scikit-learn` | Preprocessing — OneHotEncoder, MinMaxScaler, ColumnTransformer |
+| `scikit-learn` | Preprocessing - OneHotEncoder, MinMaxScaler, ColumnTransformer |
 | `tensorflow / keras` | Autoencoder and classifier neural networks |
-| `SHAP` | Explainability — which features triggered each alert |
+| `SHAP` | Explainability - which features triggered each alert |
 | `streamlit` | Alert dashboard |
 
 ---
@@ -97,7 +97,7 @@ network-anomaly-detection-ids/
 
 ```bash
 # Clone the repo
-git clone https://github.com/ShivaramHR/network-anomaly-detection-ids.git
+git clone https://github.com/yourusername/network-anomaly-detection-ids.git
 cd network-anomaly-detection-ids
 
 # Create and activate virtual environment
@@ -122,25 +122,69 @@ Run the notebooks in order: 01 → 02 → 03 → 04
 
 - [x] EDA and preprocessing
 - [x] Autoencoder anomaly detection
-- [ ] Neural network classifier
+- [x] Neural network classifier
 - [ ] SHAP explainability
 - [ ] Streamlit dashboard
 
 ---
 
-## Key Findings So Far
+## Results
 
-**Class distribution (training set):**
-- Normal traffic: 67,343 connections (53.5%)
-- Neptune (DoS): 41,214 connections (32.7%) — dominant attack type
-- Remaining 21 attack types: combined 17,416 connections (13.8%)
+### Stage 1 - Autoencoder Anomaly Detection
 
-This heavy imbalance is why accuracy alone is a misleading metric for this problem. The project uses precision, recall and F1-score per class to evaluate honestly.
+The autoencoder was trained exclusively on normal traffic (67,343 connections) and achieved a final MSE loss of **0.0174**, converging by epoch 10 out of 20 - a healthy plateau indicating the model learned general normal traffic patterns without memorising individual samples.
 
-**Categorical features:**
-- `protocol_type`: 3 unique values (tcp, udp, icmp)
-- `service`: 70 unique values
-- `flag`: 11 unique values — notably `S0` appears almost exclusively in attack traffic
+Detection threshold was set at the **95th percentile** of normal traffic reconstruction errors (threshold = 0.0492).
+
+| Metric | Value |
+|---|---|
+| Total connections evaluated | 125,973 |
+| Flagged as anomalies | 52,391 (41.6%) |
+| Actual attacks in dataset | 58,630 |
+| Estimated attack recall | ~83.6% |
+| Expected false positive rate | ~5% (by threshold design) |
+
+**Notable observation:** The reconstruction error distribution of normal traffic is bimodal - two distinct clusters appear around error values 0.003 and 0.025. This reflects two behavioural patterns in normal traffic: short lightweight connections (low error) and longer HTTP-style sessions (moderate error). The autoencoder learned both patterns independently.
+
+**Novel attack detection:** The test set contains 17 attack types unseen during training. The autoencoder flags these as anomalies based purely on their deviation from normal traffic - demonstrating the core advantage of anomaly-based detection over signature matching, which would miss these entirely.
+
+---
+
+### Stage 2 - Neural Network Classifier
+
+A three-layer neural network (64→32→16→softmax) with dropout was trained on flagged anomalies from the training set to classify attack types.
+
+| Metric | Value |
+|---|---|
+| Training accuracy | 95.52% |
+| Validation accuracy | 97.65% |
+| Test accuracy | 80.00% |
+| Weighted F1-score | 0.75 |
+
+**Per-class breakdown (key classes):**
+
+| Attack | Type | Precision | Recall | F1 | Support |
+|---|---|---|---|---|---|
+| neptune | DoS | 1.00 | 1.00 | 1.00 | 4,657 |
+| satan | Probe | 0.82 | 0.89 | 0.86 | 735 |
+| normal | - | 0.79 | 0.90 | 0.84 | 9,711 |
+| portsweep | Probe | 0.56 | 0.96 | 0.71 | 157 |
+| smurf | DoS | 0.46 | 0.91 | 0.61 | 665 |
+| guess_passwd | R2L | 0.00 | 0.00 | 0.00 | 1,231 |
+| warezmaster | R2L | 0.00 | 0.00 | 0.00 | 944 |
+
+**Key finding:** The classifier performs strongly on DoS and Probe attacks but fails entirely on R2L attacks (guess_passwd, warezmaster) despite their significant representation in the test set. R2L attacks are specifically designed to mimic legitimate user behaviour, resulting in low autoencoder reconstruction error - meaning fewer R2L samples were flagged and passed to the classifier during training. This creates a learned blind spot that mirrors a well-documented challenge in real-world intrusion detection research.
+
+---
+
+## EDA Findings
+
+- Normal traffic: 67,343 connections (53.5%) - dominant class
+- Neptune (DoS): 41,214 connections (32.7%) - largest attack type
+- Remaining 21 attack types: 17,416 connections combined (13.8%)
+- `flag = S0` (incomplete connection) appears almost exclusively in attack traffic
+- `protocol_type`: 3 values (tcp, udp, icmp) - tcp dominates attack traffic
+- After OneHotEncoding categorical features, input dimensionality expands from 41 to 122 features
 
 ---
 
@@ -155,6 +199,6 @@ This heavy imbalance is why accuracy alone is a misleading metric for this probl
 
 ## References
 
-- [NSL-KDD Dataset — Canadian Institute for Cybersecurity](https://www.unb.ca/cic/datasets/nsl.html)
+- [NSL-KDD Dataset - Canadian Institute for Cybersecurity](https://www.unb.ca/cic/datasets/nsl.html)
 - [Palo Alto Networks Unit 42 Threat Research](https://unit42.paloaltonetworks.com)
-- [A Detailed Analysis of the KDD CUP 99 Data Set — Tavallaee et al.](https://www.semanticscholar.org/paper/A-detailed-analysis-of-the-KDD-CUP-99-data-set-Tavallaee-Bagheri/4dd66fb0db9c90f2da4f84a6e3dd01428d67c91b)
+- [A Detailed Analysis of the KDD CUP 99 Data Set - Tavallaee et al.](https://www.semanticscholar.org/paper/A-detailed-analysis-of-the-KDD-CUP-99-data-set-Tavallaee-Bagheri/4dd66fb0db9c90f2da4f84a6e3dd01428d67c91b)
