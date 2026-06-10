@@ -97,7 +97,7 @@ network-anomaly-detection-ids/
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/network-anomaly-detection-ids.git
+git clone https://github.com/ShivaramHR/network-anomaly-detection-ids.git
 cd network-anomaly-detection-ids
 
 # Create and activate virtual environment
