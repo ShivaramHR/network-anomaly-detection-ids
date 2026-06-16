@@ -1,6 +1,6 @@
 # ML-Based Network Intrusion Detection System with Explainable AI
 
-> ⚠️ This is a learning project built to develop practical skills in machine learning, cybersecurity data, and explainable AI. It is not production-ready software.
+> This is a learning project built to develop practical skills in machine learning, cybersecurity data, and explainable AI. It is not production-ready software.
 
 ---
 
@@ -10,7 +10,7 @@ Most traditional intrusion detection systems rely on signature matching - they f
 
 This project takes a different approach: instead of learning what attacks look like, the model learns what **normal traffic** looks like. Anything that deviates significantly from normal gets flagged as suspicious. This is called **anomaly-based detection** and is the approach used in modern commercial security tools like Palo Alto's Cortex XDR.
 
-The pipeline has three stages:
+The pipeline has four stages:
 
 ```
 Normal traffic → Train Autoencoder → learns normal behaviour
@@ -20,7 +20,7 @@ All traffic → Autoencoder → Reconstruction Error
                          ┌────────────────────┴────────────────────┐
                       Low error                               High error
                          │                                         │
-                    Not flagged                              Flagged 🚨
+                    Not flagged                              Flagged
                                                                    │
                                                     Neural Network Classifier
                                                                    │
@@ -61,8 +61,8 @@ data/
 | `numpy` | Array operations, reconstruction error calculation |
 | `scikit-learn` | Preprocessing - OneHotEncoder, MinMaxScaler, ColumnTransformer |
 | `tensorflow / keras` | Autoencoder and classifier neural networks |
-| `SHAP` | Explainability - which features triggered each alert |
-| `streamlit` | Alert dashboard |
+| `shap` | Explainability - which features triggered each classification |
+| `streamlit` | Interactive results dashboard |
 
 ---
 
@@ -72,19 +72,22 @@ data/
 network-anomaly-detection-ids/
 │
 ├── Notebooks/
-│   ├── 01_eda_and_preprocessing.ipynb   ← data exploration and preprocessing
-│   ├── 02_autoencoder.ipynb             ← anomaly detection model
-│   ├── 03_classifier.ipynb              ← attack type classification
-│   └── 04_results_and_shap.ipynb        ← evaluation and explainability
+│   ├── 01_eda_and_preprocessing.ipynb   - data exploration and preprocessing
+│   ├── 02_autoencoder.ipynb             - anomaly detection model
+│   ├── 03_classifier.ipynb              - attack type classification
+│   └── 04_shap.ipynb                   - SHAP explainability
 │
 ├── models/
-│   ├── autoencoder.h5                   ← saved autoencoder weights
-│   └── classifier.h5                   ← saved classifier weights
+│   ├── autoencoder.keras               - saved autoencoder weights
+│   ├── classifier.keras                - saved classifier weights
+│   ├── shap_neptune.png                - SHAP plot for DoS attacks
+│   └── shap_normal.png                 - SHAP plot for normal traffic
 │
-├── data/                                ← not tracked by git (see setup)
+├── data/                               - not tracked by git (see setup)
 │   ├── KDDTrain+.txt
 │   └── KDDTest+.txt
 │
+├── app.py                              - Streamlit dashboard
 ├── .gitignore
 └── README.md
 ```
@@ -105,13 +108,16 @@ python3.11 -m venv ids-env
 source ids-env/bin/activate
 
 # Install dependencies
-pip install tensorflow numpy pandas scikit-learn jupyterlab matplotlib seaborn shap streamlit
+pip install tensorflow numpy pandas scikit-learn jupyterlab matplotlib seaborn shap streamlit joblib
 
 # Download the NSL-KDD dataset from Kaggle (link above)
 # Place KDDTrain+.txt and KDDTest+.txt in the data/ folder
 
-# Launch Jupyter
+# Run notebooks in order
 jupyter lab
+
+# Launch dashboard (after running all notebooks)
+streamlit run app.py
 ```
 
 Run the notebooks in order: 01 → 02 → 03 → 04
@@ -124,7 +130,7 @@ Run the notebooks in order: 01 → 02 → 03 → 04
 - [x] Autoencoder anomaly detection
 - [x] Neural network classifier
 - [x] SHAP explainability
-- [x] Streamlit dashboard
+- [ ] Streamlit dashboard
 
 ---
 
@@ -177,6 +183,25 @@ A three-layer neural network (64→32→16→softmax) with dropout was trained o
 
 ---
 
+### Stage 3 - SHAP Explainability
+
+SHAP (SHapley Additive exPlanations) was applied to the trained classifier using GradientExplainer with 200 background samples and 400 explanation samples. SHAP values were computed per class across all 122 input features, revealing which features drove each classification decision.
+
+**Neptune (DoS) - key features identified by SHAP:**
+- `dst_host_srv_count` - number of connections to the same service on the destination host. DoS attacks flood a single service, making this feature spike abnormally high
+- `src_bytes` - bytes sent from source. DoS attacks send large volumes of data, producing unusually high values
+- `count` - connections to the same host in the last 2 seconds. Flood attacks produce extremely high values that are almost never seen in normal traffic
+- `serror_rate` - percentage of connections with SYN errors. Neptune specifically creates half-open TCP connections, making this rate approach 1.0
+
+**Normal traffic - key features identified by SHAP:**
+- `dst_host_same_srv_rate` - normal users connect to varied services, keeping this rate moderate
+- `flag = SF` - normal connections complete properly (SYN-FIN), a strong signal of legitimate traffic
+- `logged_in` - normal sessions involve successful logins, consistently pushing predictions toward normal
+
+**Broader insight:** SHAP confirms that the classifier learned domain-relevant patterns rather than spurious correlations. The features it relies on for DoS detection (connection rates, byte volumes, error rates) align directly with what security researchers know about how DoS attacks behave at the network level.
+
+---
+
 ## EDA Findings
 
 - Normal traffic: 67,343 connections (53.5%) - dominant class
@@ -194,6 +219,7 @@ A three-layer neural network (64→32→16→softmax) with dropout was trained o
 - Add threshold tuning curve (precision-recall tradeoff at different thresholds)
 - Extend to CICIDS2017 dataset for more realistic modern attack patterns
 - Add real-time packet capture using Scapy for live detection
+- Address R2L blind spot using SMOTE oversampling on underrepresented attack classes
 
 ---
 
