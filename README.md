@@ -123,8 +123,8 @@ Run the notebooks in order: 01 → 02 → 03 → 04
 - [x] EDA and preprocessing
 - [x] Autoencoder anomaly detection
 - [x] Neural network classifier
-- [ ] SHAP explainability
-- [ ] Streamlit dashboard
+- [x] SHAP explainability
+- [x] Streamlit dashboard
 
 ---
 
