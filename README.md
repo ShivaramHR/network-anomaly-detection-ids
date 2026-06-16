@@ -130,7 +130,7 @@ Run the notebooks in order: 01 → 02 → 03 → 04
 - [x] Autoencoder anomaly detection
 - [x] Neural network classifier
 - [x] SHAP explainability
-- [ ] Streamlit dashboard
+- [x] Streamlit dashboard
 
 ---
 
