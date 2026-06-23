@@ -13,22 +13,34 @@ This project takes a different approach: instead of learning what attacks look l
 The pipeline has four stages:
 
 ```
-Normal traffic → Train Autoencoder → learns normal behaviour
-                                              │
-All traffic → Autoencoder → Reconstruction Error
-                                              │
-                         ┌────────────────────┴────────────────────┐
-                      Low error                               High error
-                         │                                         │
-                    Not flagged                              Flagged
-                                                                   │
-                                                    Neural Network Classifier
-                                                                   │
-                                                   Attack Type (DoS/Probe/R2L/U2R)
-                                                                   │
-                                                    SHAP Explainability
-                                                                   │
-                                                    Streamlit Dashboard
+graph TD
+    classDef data fill:#2b2b2b,stroke:#4f4f4f,color:#fff;
+    classDef model fill:#1f4e79,stroke:#2e75b6,color:#fff;
+    classDef alert fill:#c00000,stroke:#ff0000,color:#fff;
+
+    subgraph Data Ingestion
+        A[(Raw NSL-KDD Traffic)] --> B[ColumnTransformer: OneHot / MinMaxScaler]
+    end
+
+    subgraph Phase 1: Anomaly Isolation
+        B --> C[TensorFlow Autoencoder]
+        C --> D{Reconstruction Error > Threshold?}
+    end
+
+    subgraph Phase 2: Threat Classification & XAI
+        D -->|High Error: Flagged| E[Deep Neural Network Classifier]
+        D -->|Low Error| F[Log as Normal Traffic]
+        E --> G[Categorized Attack: DoS / Probe / R2L / U2R]
+        G --> H[SHAP Explainability Engine]
+    end
+
+    subgraph Analytics Layer
+        H --> I[Streamlit Live Dashboard]
+    end
+
+    class A,B data;
+    class C,E,H model;
+    class G,I alert;
 ```
 
 ---
