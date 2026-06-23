@@ -12,7 +12,7 @@ This project takes a different approach: instead of learning what attacks look l
 
 The pipeline has four stages:
 
-```
+``` mermaid
 graph TD
     classDef data fill:#2b2b2b,stroke:#4f4f4f,color:#fff;
     classDef model fill:#1f4e79,stroke:#2e75b6,color:#fff;
